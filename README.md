@@ -29,9 +29,9 @@ A Visual Studio or MinGW C/C++ compiler installation is required for generating 
 
 ### Getting the required Source Code  and Build
 
-1. Checkout bml library from Github:
+1. Checkout bml library from this Github:
 	
-	* ``git clone https://github.com/johaahn/bml.git``
+	* ``git clone https://github.com/seagnal/bml.git``
 
 2. Build bml:
 
@@ -99,7 +99,7 @@ The following instructions describes how to compile and use the bml library in O
 
 1. Checkout bml library from Github:
 	
-	* ``git clone https://github.com/johaahn/bml.git``
+	* ``git clone https://github.com/seagnal/bml.git``
 
 2. Build bml:
 
@@ -149,7 +149,7 @@ If the Octave mex compiling completed successfully the following mex functions a
 
 1. Checkout bml library from Github:
 	
-	* ``git clone https://github.com/johaahn/bml.git``
+	* ``git clone https://github.com/seagnal/bml.git``
 	
 	* TO DO
 	
