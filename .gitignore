@@ -1,0 +1,5 @@
+octave/*.o
+octave/*.mex
+python/build/
+python/build___.sh
+python/setup___.py
