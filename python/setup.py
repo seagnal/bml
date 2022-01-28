@@ -1,11 +1,25 @@
 from distutils.core import setup, Extension
+import lsb_release
+
+print(lsb_release.get_distro_information())
+
+if lsb_release.get_distro_information()['CODENAME'] == 'focal':
+    python_lib = 'boost_python-py38'
+elif lsb_release.get_distro_information()['CODENAME'] == 'bionic':
+    python_lib = 'boost_python-py36'
+elif lsb_release.get_distro_information()['CODENAME'] == 'xenial':
+    python_lib = 'boost_python-py35'
+else:
+    python_lib = 'boost_python-py34'
+
+
 
 module1 = Extension('bml',
                     define_macros = [('MAJOR_VERSION', '1'),
                                      ('MINOR_VERSION', '0')],
                     include_dirs = ['../sab_parser'],
                     #libraries = ['boost_python3'],
-                    libraries = ['boost_python-py35'],
+                    libraries = [python_lib],
                     library_dirs = ['/usr/local/lib'],
                     sources = ['bml.cc','../sab_parser/bml.c'])
 
