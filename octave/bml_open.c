@@ -4,14 +4,12 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
-#ifndef WIN32
-    #include <unistd.h>
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <netdb.h>
+#ifdef WIN32
+#include <winsock2.h>
 #else
-    #include <winsock2.h>
+#include <netdb.h>
 #endif
 
 //#define DEBUG
@@ -815,7 +813,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[]) {
 		}
 		if (ps_handle->i_socket != -1) {
 #ifndef WIN32
-            close(ps_handle->i_socket);
+			close(ps_handle->i_socket);
 #else
             closesocket(ps_handle->i_socket);
 #endif			

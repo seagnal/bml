@@ -54,6 +54,13 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#if defined(__GNUC__) || defined(__MINGW64__) || defined(__MINGW32__)
+#include <unistd.h>
+#elif defined (_MSC_VER)
+#include <winsock2.h>
+#else
+#error "Unknown compiler"
+#endif
 
 namespace bml {
 
@@ -531,7 +538,7 @@ struct node_resource_segment {
   *  @return T object filled with segment data
   */
 	template<typename T> T get_data(void) const {
-		T c_tmp;
+		T c_tmp = T();
 		M_ASSERT(_pc_resource);
 		M_ASSERT(_sz_data == sizeof(T));
 		char const * pc_tmp = (char const *) &c_tmp;
@@ -770,6 +777,41 @@ public:
 
 };
 
+
+ /*!
+  * Socket Node Writer class.
+  * Class used to write a BML node into a FILE
+  */
+template<template<class > class G>
+class node_socket_writer: public node_writer<G> {
+ /*!
+  *  Output File descriptor
+  */
+	int _i_socket_fd;
+public:
+ /*!
+  *  Constructor of a file node writer.
+  * @param in_i_socket_fd Socket file descriptor.
+  */
+	node_socket_writer(int in_i_socket_fd);
+
+ /*!
+  *   Destructor of file node writer.
+  */
+	~node_socket_writer();
+
+  /*!
+  *   Write char buffer array into Socket.
+  *  Write external buffer into a Socket
+  *  @param in_pc_buffer : Pointer to external buffer
+  *  @param in_sz_data : size of external buffer
+  *  @return EC_BML_SUCCESS on success
+  *  EC_BML_FAILURE on failure
+  */
+	int write_data(char* in_pc_buffer, size_t in_sz_buffer);
+
+};
+
  /*!
   * Buffer Node Writer class.
   * Class used to write a BML node into a Raw Buffer
@@ -929,6 +971,39 @@ public:
 	uint64_t get_size(void);
 };
 
+
+/*!
+* File Node Parser class.
+* Class used to fill a BML node from a file
+*/
+template<template<class > class G>
+class node_socket_parser: public node_parser<G> {
+	/*!
+	 *  Input File descriptor
+	 */
+	int _i_socket_fd;
+public:
+
+	/*!
+   *  Constructor of file node parser.
+	 * @param in_str_path path of file to open in order to extract bml data from
+   */
+	node_socket_parser(int in_i_socket_fd);
+	/*!
+	 *   Destructor of file node parser.
+	 */
+	~node_socket_parser();
+
+	/*!
+  *   Read char buffer array from a file.
+  *  @param in_pc_buffer : Pointer to external buffer
+  *  @param in_sz_data : size of external buffer
+  *  @return EC_BML_SUCCESS on success
+  *  EC_BML_FAILURE on failure
+  */
+	int parse_data(char* in_pc_buffer, size_t in_sz_buffer);
+};
+
 /*!
 * Buffer Node Parser class.
 * Class used to fill a BML node from a char array buffer
@@ -1024,6 +1099,40 @@ public:
 };
 
 /*!
+* Is container identification class.
+*/
+
+template<typename ...>
+using to_void = void; // maps everything to void, used in non-evaluated contexts
+
+template<typename T, typename = void>
+struct is_container : std::false_type
+{};
+template<typename T>
+struct is_container<T,
+        to_void<decltype(std::declval<T>().begin()),
+                decltype(std::declval<T>().end()),
+                typename T::value_type
+        >> : std::true_type // will  be enabled for iterable objects
+{};
+template<typename T, typename = void>
+struct is_map : std::false_type
+{};
+template<typename T>
+struct is_map<T,
+        to_void<typename T::key_type
+        >> : std::true_type // will  be enabled for iterable objects
+{};
+template<typename T, typename = void>
+struct is_contiguous : std::false_type
+{};
+template<typename T>
+struct is_contiguous<T,
+        to_void<decltype(std::declval<T>().data())
+        >> : std::true_type // will  be enabled for iterable objects
+{};
+
+/*!
 * BML Node class.
 * Class used to manipulate BML nodes:
 *  - Add/Remove Childs
@@ -1079,6 +1188,11 @@ public:
 	/*! Iterator type of find() result type. */
 	typedef typename std::vector<it>::iterator find_iterator;
 
+  /* equal_range() result type. */
+  typedef typename std::pair<node<T, G>::it,node<T, G>::it> er_it;
+
+  /* equal_range() result type (const). */
+  typedef typename std::pair<node<T, G>::const_it,node<T, G>::const_it> const_er_it;
 private:
 	/*! memory init function */
 	void _init(void);
@@ -1203,7 +1317,9 @@ public:
 	 *
 	 * Notice that result is an alias of std::vector<it>
 	 */
-	node<T,G>::find_result find(T const & in_i_id);
+	node<T,G>::find_result find(T const & in_id);
+  node<T,G>::er_it equal_range(T const & in_id);
+  node<T,G>::const_er_it equal_range(T const & in_id) const;
 
 	/*!
 	 * Get all childs of node.
@@ -1212,6 +1328,26 @@ public:
 	 * Notice that result is an alias of std::vector<it>
 	 */
 	node<T,G>::find_result childs(void);
+  /*!
+	 * Get first child iterator.
+	 * @return            begin iterator.
+	 */
+  node<T, G>::it begin(void);
+  /*!
+   * Get last child iterator.
+   * @return            end iterator.
+   */
+  node<T, G>::it end(void);
+  /*!
+   * Get first child iterator.
+   * @return            begin const iterator.
+   */
+  node<T, G>::const_it cbegin(void) const;
+  /*!
+   * Get last child iterator.
+   * @return            end const iterator.
+   */
+  node<T, G>::const_it cend(void) const;
 
 	/*!
 	 * Internal event of new resource request.
@@ -1305,8 +1441,9 @@ public:
 	 * node resource segment of node.
 	 * @return  copied data of node casted in T2 type.
 	 */
-	template<typename T2> T2 get_data(void) const;
-
+  template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && !is_contiguous<T2>::value >::type* = nullptr> T2 get_data(void) const;
+  template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && is_contiguous<T2>::value >::type* = nullptr> T2 get_data(void) const;
+  template<typename T2, typename std::enable_if<!is_container<T2>::value >::type* = nullptr> T2 get_data(void) const;
 	/*!
 	 * Set data content.
 	 *
@@ -1317,7 +1454,9 @@ public:
 	 * Old data is cleared.
 	 * @param in source of data
 	 */
-	template<typename T2> void set_data(T2 const & in);
+  template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && !is_contiguous<T2>::value >::type* = nullptr> void set_data(T2 const & in);
+	template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && is_contiguous<T2>::value >::type* = nullptr> void set_data(T2 const & in);
+  template<typename T2, typename std::enable_if<!is_container<T2>::value >::type* = nullptr> void set_data(T2 const & in);
 
 	/*!
 	 * Set data from node resource segment.
@@ -1598,6 +1737,16 @@ void node<T, G>::dump() {
 }
 
 template<typename T, template<class > class G>
+typename node<T,G>::er_it node<T,G>::equal_range(T const & in_id) {
+  return _m_childs.equal_range(in_id);
+}
+
+template<typename T, template<class > class G>
+typename node<T,G>::const_er_it node<T,G>::equal_range(T const & in_id) const {
+  return _m_childs.equal_range(in_id);
+}
+
+template<typename T, template<class > class G>
 typename node<T, G>::find_result node<T, G>::find(T const & in_id) {
 	node<T, G>::find_result v_tmp;
 	std::pair<it, it> c_ret = _m_childs.equal_range(in_id);
@@ -1608,6 +1757,18 @@ typename node<T, G>::find_result node<T, G>::find(T const & in_id) {
 
 	return v_tmp;
 }
+
+template<typename T, template<class > class G>
+typename node<T, G>::it node<T,G>::begin() { return _m_childs.begin(); }
+
+template<typename T, template<class > class G>
+typename node<T, G>::it node<T,G>::end() { return _m_childs.end(); }
+
+template<typename T, template<class > class G>
+typename node<T, G>::const_it node<T,G>::cbegin() const { return _m_childs.cbegin(); }
+
+template<typename T, template<class > class G>
+typename node<T, G>::const_it node<T,G>::cend() const { return _m_childs.cend(); }
 
 template<typename T, template<class > class G>
 typename node<T, G>::find_result node<T, G>::childs(void) {
@@ -1711,18 +1872,98 @@ node<T, G> & node<T, G>::operator()(T const & in_id, uint64_t in_i_indice) {
 }
 
 /* common assignment */
-template<typename T, template<class > class G> template<typename T2>
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<!is_container<T2>::value >::type*>
 void node<T, G>::set_data(T2 const & in) {
+  //static_assert(std::is_integral<T2>::value || std::is_floating_point<T2>::value || std::is_pointer<T2>::value, "Either integral, float or pointer required.");
 	resize(sizeof(T2));
 	_s_segment.template set_data<T2>(in);
 	VALGRIND_CHECK_VALUE_IS_DEFINED(in);
+  //std::cout << "SET COPY" << std::endl;
 }
 
-/* explicit funtion cast  */
-template<typename T, template<class > class G> template<typename T2>
-T2 node<T, G>::get_data(void) const {
-	return _s_segment.template get_data<T2>();;
+
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && !is_contiguous<T2>::value >::type*>
+void node<T, G>::set_data(T2 const & in) {
+  typedef typename T2::value_type T2S;
+  static_assert(!is_container<T2S>::value, "Value type must not be a container.");
+  uint32_t i_cnt = 0;
+  size_t i_size = in.size();
+	if(i_size) {
+  resize(sizeof(T2S)*i_size);
+  T2S* pc_tmp = mmap<T2S>();
+  for (auto pc_it = in.cbegin(); pc_it != in.cend(); pc_it++) {
+    *pc_tmp++ = *pc_it;
+    i_cnt++;
+  	VALGRIND_CHECK_VALUE_IS_DEFINED(*pc_it);
+  }
+  //std::cout << "SET DATA NONCONTIGUOUS" << std::endl;
+  assert(i_cnt == i_size);
 }
+}
+
+
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && is_contiguous<T2>::value >::type*>
+void node<T, G>::set_data(T2 const & in) {
+  typedef typename T2::value_type T2S;
+  //static_assert(std::is_integral<T2S>::value || std::is_floating_point<T2S>::value || std::is_pointer<T2S>::value, "Either integral, float or pointer required.");
+  static_assert(!is_container<T2S>::value, "Value type must not be a container.");
+  size_t i_size = in.size();
+	if(i_size) {
+  resize(sizeof(T2S)*i_size);
+  memcpy_from_buffer((const char*)in.data(), in.size()*sizeof(T2S));
+  VALGRIND_CHECK_MEM_IS_DEFINED(in.data(), in.size()*sizeof(T2S));
+	}
+  //std::cout << "SET DATA CONTIGUOUS" << std::endl;
+}
+
+/* common assignment */
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<!is_container<T2>::value >::type*>
+T2 node<T, G>::get_data(void) const {
+  //static_assert(std::is_integral<T2>::value || std::is_floating_point<T2>::value || std::is_pointer<T2>::value, "Either integral, float or pointer required.");
+	return _s_segment.template get_data<T2>();
+	//VALGRIND_CHECK_VALUE_IS_DEFINED(in);
+  //std::cout << "SET COPY" << std::endl;
+}
+
+
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && !is_contiguous<T2>::value >::type*>
+T2 node<T, G>::get_data(void) const {
+  typedef typename T2::value_type T2S;
+  T2 c_tmp;
+  assert(get_size() >= sizeof(T2S));
+  assert(get_size()%sizeof(T2S) == 0);
+  auto i_size = (get_size()/sizeof(T2S));
+	if(i_size) {
+	  T2S* pc_tmp = mmap<T2S>();
+	  for (auto i_cnt = 0U; i_cnt != i_size; i_cnt++) {
+	    c_tmp.push_back(*pc_tmp++);
+	  }
+	}
+  return c_tmp;
+}
+
+
+template<typename T, template<class > class G>
+template<typename T2, typename std::enable_if<is_container<T2>::value && !is_map<T2>::value && is_contiguous<T2>::value >::type*>
+T2 node<T, G>::get_data(void) const {
+  typedef typename T2::value_type T2S;
+  //static_assert(std::is_integral<T2S>::value || std::is_floating_point<T2S>::value || std::is_pointer<T2S>::value, "Either integral, float or pointer required.");
+  T2 c_tmp;
+  assert(get_size() >= sizeof(T2S));
+  assert(get_size()%sizeof(T2S) == 0);
+	if(get_size()) {
+	  c_tmp.resize(get_size()/sizeof(T2S));
+	  memcpy_to_buffer((const char*)c_tmp.data(), c_tmp.size()*sizeof(T2S));
+	}
+  return c_tmp;
+  //std::cout << "SET DATA CONTIGUOUS" << std::endl;
+}
+
 /* mmap assignment */
 template<typename T, template<class > class G> template<typename T2>
 T2 * node<T, G>::mmap(void) const {
@@ -1738,6 +1979,9 @@ bool node<T, G>::is_mmapable(void) const {
 
 template<typename T, template<class > class G> template<typename T2>
 T2 & node<T, G>::map(void) const {
+	if (_s_segment.size() != sizeof(T2)) {
+		std::cout << "_s_segment.size() : " << _s_segment.size() << " ;  sizeof(T2) : " << sizeof(T2) << std::endl;
+	}
 	M_ASSERT(_s_segment.size() == sizeof(T2));
 	T2 * c_tmp = (T2 *) _s_segment.mmap();
 	return *c_tmp;
@@ -1838,7 +2082,7 @@ int node<T, G>::from_parser(node_parser<G> & in_c_parser) {
 
 	uint64_t i_sz_id;
 	int i_length_id;
-	int i_length_size;
+	int i_length_size = 0;
 	bool b_ext;
 
 	while (b_loop) {
@@ -2400,7 +2644,7 @@ void node<T, G>::copy_link(node<T, G> const & other) {
 	{
 		const_it pc_it = other._m_childs.begin();
 		while (pc_it != other._m_childs.end()) {
-			add(pc_it->first)->copy_link(*(pc_it->second));
+			add(pc_it->second->get_id())->copy_link(*(pc_it->second));
 			pc_it++;
 		}
 	}
@@ -2416,7 +2660,13 @@ void node<T, G>::copy(node<T, G> const & other) {
 	/* Copy resource */
 	if (other._s_segment.size()) {
 		resize(other._s_segment.size());
-		_s_segment.memcpy_from_segment(other._s_segment);
+		if(other._s_segment.mmap()) {
+			_s_segment.memcpy_from_segment(other._s_segment);
+		} else if(_s_segment.mmap()){
+			other._s_segment.memcpy_to_segment(_s_segment);
+		} else {
+			M_BUG();
+		}
 	}
 
 	/* Copy childs */
@@ -2424,7 +2674,7 @@ void node<T, G>::copy(node<T, G> const & other) {
 	{
 		const_it pc_it = other._m_childs.begin();
 		while (pc_it != other._m_childs.end()) {
-			add(pc_it->first)->copy(*(pc_it->second));
+			add(pc_it->second->get_id())->copy(*(pc_it->second));
 			pc_it++;
 		}
 	}
@@ -2763,6 +3013,43 @@ int node_buffer_writer<G>::write_data(char* in_pc_buffer, size_t in_sz_buffer) {
 	return EC_BML_SUCCESS;
 }
 
+
+/******************************
+ * SOCKET WRITER
+ */
+template<template<class > class G>
+node_socket_writer<G>::node_socket_writer(int in_i_socket_fd) : _i_socket_fd(in_i_socket_fd) {
+	if (_i_socket_fd < 0) {
+		throw std::runtime_error("Invalid socket file descriptor");
+	}
+}
+
+template<template<class > class G>
+node_socket_writer<G>::~node_socket_writer() {
+}
+
+template<template<class > class G>
+int node_socket_writer<G>::write_data(char* in_pc_buffer, size_t in_sz_buffer) {
+	//D("%llu %u %llu",_i_offset,in_sz_buffer,_sz_buffer);
+	VALGRIND_CHECK_MEM_IS_DEFINED(in_pc_buffer, in_sz_buffer);
+
+  	size_t sz_bytes_written_total = 0;
+	ssize_t sz_bytes_written;
+
+	while (sz_bytes_written_total < in_sz_buffer) {
+		sz_bytes_written = write(_i_socket_fd, in_pc_buffer + sz_bytes_written_total, in_sz_buffer - sz_bytes_written_total);
+
+		if (sz_bytes_written < 0) {
+			// An error occurred during writing
+			return EC_BML_FAILURE;
+		}
+
+		sz_bytes_written_total += sz_bytes_written;
+	}
+
+	return EC_BML_SUCCESS;
+}
+
 /******************************
  * PARSER
  */
@@ -2808,6 +3095,9 @@ template<template<class > class G>
 node_file_parser<G>::node_file_parser(std::string const & in_str_path) :
 		node_parser<G>() {
 
+    if(!in_str_path.size()){
+      return;
+    }
 	/* Opening file */
 	_c_is.open(in_str_path.c_str(), std::ios::binary);
 
@@ -2818,6 +3108,10 @@ node_file_parser<G>::node_file_parser(std::string const & in_str_path) :
 	/* check BML word presence */
 	if ((ac_tmp[0] != 'B') || (ac_tmp[1] != 'M') || (ac_tmp[2] != 'L')
 			|| (ac_tmp[3] != 0)) {
+        for (size_t i = 0; i < 4; i++) {
+          std::cout << "ac_tmp["<<i<<"] =" << ac_tmp[i] << '\n'; fflush(stdout);
+        }
+        std::cout << "PATH :" << in_str_path.c_str() <<'\n';fflush(stdout);
 		throw std::runtime_error("Invalid BML format");
 		//TODO return null pointer
 	}
@@ -2920,6 +3214,46 @@ int node_buffer_parser<G>::parse_data(char* in_pc_buffer, size_t in_sz_buffer) {
 
 	_i_offset += in_sz_buffer;
 	return EC_BML_SUCCESS;
+}
+
+
+/******************************
+ * SOCKET PARSER
+ */
+template<template<class > class G>
+node_socket_parser<G>::node_socket_parser(int in_i_socket_fd) :
+		node_parser<G>() {
+	_i_socket_fd = in_i_socket_fd;
+}
+
+template<template<class > class G>
+node_socket_parser<G>::~node_socket_parser() {
+}
+
+template<template<class > class G>
+int node_socket_parser<G>::parse_data(char* in_pc_buffer, size_t in_sz_buffer) {
+    size_t sz_bytes_read_total = 0;
+    ssize_t sz_bytes_read;
+
+    while (sz_bytes_read_total < in_sz_buffer) {
+        sz_bytes_read = read(_i_socket_fd, in_pc_buffer + sz_bytes_read_total, in_sz_buffer - sz_bytes_read_total);
+
+        if (sz_bytes_read < 0) {
+            // An error occurred during reading
+            return EC_BML_FAILURE;
+        } else if (sz_bytes_read == 0) {
+            // No more data to read
+            if (sz_bytes_read_total == 0) {
+                return EC_BML_NODATA; // No data was read at all
+            } else {
+                break; // Some data was read, but no more is available
+            }
+        }
+
+        sz_bytes_read_total += sz_bytes_read;
+    }
+
+    return EC_BML_SUCCESS;
 }
 
 /******************************

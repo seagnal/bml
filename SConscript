@@ -21,3 +21,16 @@ sw_dict = {
 }
 
 bs.AddSW(sw_dict)
+
+
+
+sw_dict = {
+    'name':'bml-test',
+    'type':'program',
+    'sources':'bml_test.cc',
+    'includes':['./'],
+#    'libs':{'shared':['check'], 'static':['node']}
+    'libs':{'static':['node']}
+}
+
+bs.AddSW(sw_dict)

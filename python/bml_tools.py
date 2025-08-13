@@ -34,6 +34,17 @@ class bml_buffer(bml.writer, bml.parser):
 
         self.buffer = []
 
+    def __init__(self, buffer):
+        """!@brief Constructor of BML buffer.
+            """
+        bml.writer.__init__(self)
+        bml.parser.__init__(self)
+
+        self.buffer = []
+        self.read_view_tmp = memoryview(buffer)
+        self.read_start_tmp = 0
+        self.read_size_tmp = len(buffer)
+        self.offset = 0
 
     def io_write(self, in_data):
         """!@brief IO write callback of BML buffer.
@@ -50,7 +61,12 @@ class bml_buffer(bml.writer, bml.parser):
             @param in_first_header first header flag allow callback to exit on new data.
             """
         ## TODO
-        print("TODO")
+        assert(in_sz_data <= self.read_size_tmp)
+        view_data = self.read_view_tmp[self.read_start_tmp:self.read_start_tmp+in_sz_data]
+        self.read_start_tmp += in_sz_data
+        self.read_size_tmp -= in_sz_data
+        #print "Extract: "+str(in_sz_data)+"bytes"
+        return view_data.tobytes()
 
 
 class bml_file(bml.writer, bml.parser):

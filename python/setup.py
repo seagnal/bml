@@ -3,8 +3,10 @@ import lsb_release
 
 print(lsb_release.get_distro_information())
 
-if lsb_release.get_distro_information()['CODENAME'] == 'focal':
-    python_lib = 'boost_python-py38'
+if lsb_release.get_distro_information()['CODENAME'] == 'jammy':
+    python_lib = 'boost_python310'
+elif lsb_release.get_distro_information()['CODENAME'] == 'focal':
+    python_lib = 'boost_python38'
 elif lsb_release.get_distro_information()['CODENAME'] == 'bionic':
     python_lib = 'boost_python-py36'
 elif lsb_release.get_distro_information()['CODENAME'] == 'xenial':

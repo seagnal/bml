@@ -4,15 +4,13 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-
 #if defined(__GNUC__) || defined(__MINGW64__) || defined(__MINGW32__)
-	#include <unistd.h>
+#include <unistd.h>
 #elif defined (_MSC_VER)
 	#include <winsock2.h>
 #else
 	#error "Unknown compiler"
 #endif
-
 
 #include <bml.h>
 #include "bml_handle.h"

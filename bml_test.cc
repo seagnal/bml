@@ -6,6 +6,7 @@
 
 #include <check.h>
 
+using namespace bml;
 
 START_TEST(test_write_read_from_buffer) {
 
@@ -16,6 +17,27 @@ START_TEST(test_write_read_from_file) {
 } END_TEST
 
 START_TEST(test_copy) {
+
+  node<uint32_t, std::shared_ptr> c_node(1234);
+  node<uint32_t, std::shared_ptr> c_node_cpy;
+  node<uint32_t, std::shared_ptr> c_node_cpy_link;
+
+  c_node.set_data<uint32_t>(10);
+  c_node(1).set_data<uint32_t>(1);
+
+  c_node_cpy.copy(c_node);
+  c_node_cpy_link.copy_link(c_node);
+
+
+  ck_assert(c_node_cpy.get_data<uint32_t>() == 10);
+  ck_assert(c_node_cpy_link.get_data<uint32_t>() == 10);
+  ck_assert(c_node.get_data<uint32_t>() == 10);
+
+  c_node_cpy_link.set_data<uint32_t>(20);
+
+  ck_assert(c_node_cpy.get_data<uint32_t>() == 10);
+  ck_assert(c_node_cpy_link.get_data<uint32_t>() == 20);
+  ck_assert(c_node.get_data<uint32_t>() == 20);
 
 } END_TEST
 
@@ -35,16 +57,191 @@ START_TEST(test_external_segment) {
 } END_TEST
 
 
-START_TEST(test_find_childs) {
+START_TEST(test_container) {
+  std::cout << "test_container START" << std::endl;
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    //std::basic_string<char> str_tmp("qwertyuiop");
+    std::list<uint32_t> l_tmp;
+    l_tmp.push_back(0);
+    l_tmp.push_back(1);
+    c_node.set_data(l_tmp);
+    ck_assert(c_node.get_size() == sizeof(uint32_t)*2);
+    std::list<uint32_t> l_tmp_res;
 
+    l_tmp_res = c_node.get_data<std::list<uint32_t>>();
+    ck_assert(l_tmp_res == l_tmp);
+  }
+  //std::cout << c_node.get_size() << std::endl;
+
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    std::string str_test("abc");
+    c_node.set_data(str_test);
+    ck_assert(c_node.get_size() == 3);
+    std::string str_tmp_res;
+    str_tmp_res = c_node.get_data<std::string>();
+    ck_assert(str_tmp_res == str_test);
+  }
+
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    std::vector<float> vf_test = {1,2,3,4,5};
+    c_node.set_data(vf_test);
+    ck_assert(c_node.get_size() == 5*sizeof(float));
+    std::vector<float> vf_res = c_node.get_data<std::vector<float>>();
+    ck_assert(vf_test == vf_res);
+  }
+
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    struct s_struct_t {
+      uint32_t i_data;
+      uint64_t i_dummy;
+    } s_struct, s_struct2;
+    s_struct.i_data = 10;
+    s_struct.i_dummy = 11;
+    c_node.set_data(s_struct);
+    ck_assert(c_node.get_size() == sizeof(s_struct));
+    s_struct2 = c_node.get_data<s_struct_t>();
+    ck_assert(s_struct2.i_data == s_struct.i_data);
+    ck_assert(s_struct2.i_dummy == s_struct.i_dummy);
+  }
+
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    struct s_struct_t{
+      uint32_t i_data;
+      uint64_t i_dummy;
+
+      bool operator == (const s_struct_t &rhs) const
+      {
+          if(i_data != rhs.i_data) return false;
+          if(i_dummy != rhs.i_dummy) return false;
+          return true;
+      }
+
+    } s_struct;
+    std::vector<s_struct_t> vs_tmp(10);
+    uint32_t i_cnt = 0;
+    for(auto & s_item : vs_tmp) {
+      s_item.i_data = i_cnt++;
+      s_item.i_dummy = i_cnt++;
+    }
+    c_node.set_data(vs_tmp);
+    ck_assert(c_node.get_size() == 10*sizeof(s_struct));
+    std::vector<s_struct_t> vs_tmp_res;
+    vs_tmp_res = c_node.get_data<std::vector<s_struct_t>>();
+    ck_assert(vs_tmp_res == vs_tmp);
+    ck_assert(vs_tmp_res.size() == vs_tmp.size());
+  }
+
+  /* Should not compile. Its ok.
+  {
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    std::vector<bool> vf_toto = {1,0,1,0,1};
+    c_node.set_data(vf_toto);
+    ck_assert(c_node.get_size() == 5*sizeof(bool));
+  }
+  }
+  */
+
+  /* Should not compile. Its ok. */
+  #if 0
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    //std::basic_string<char> str_tmp("qwertyuiop");
+    std::list<std::string> l_tmp;
+    l_tmp.push_back(std::string("ddd"));
+    l_tmp.push_back(std::string("xxxx"));
+    c_node.set_data(l_tmp);
+    ck_assert(c_node.get_size() == sizeof(uint32_t)*2);
+  }
+  #endif
+
+
+/*
+  MAP not supported
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    std::map<uint32_t, uint64_t> mi_data;
+    mi_data[0] = 1;
+    mi_data[56] = 2;
+    mi_data[567] = 3;
+    c_node.set_data(mi_data);
+    ck_assert(c_node.get_size() == 3*sizeof(uint64_t));
+  }
+  */
+
+  {
+    node<uint32_t, std::shared_ptr> c_node(1234);
+    c_node.set_data(double(5));
+    ck_assert(c_node.get_size() == sizeof(double));
+  }
+
+  std::cout << "test_container END" << std::endl;
+} END_TEST
+
+
+START_TEST(test_find_childs) {
+  std::cout << "test_find_childs START" << std::endl;
+
+  node<uint32_t, std::shared_ptr> c_node(1234);
+  c_node.set_data<uint32_t>(10);
+  c_node(1).set_data<uint32_t>(1);
+  c_node(2).set_data<uint32_t>(1);
+  c_node(2,1).set_data<uint32_t>(2);
+  c_node(2,2).set_data<uint32_t>(3);
+  c_node(3).set_data<uint32_t>(3);
+  c_node(3)(2).set_data<uint32_t>(42);
+  c_node(4).set_data<uint32_t>(4);
+  c_node(5).set_data<uint32_t>(5);
+
+  uint16_t i_tmp = 0;
+  auto res = c_node.equal_range(2);
+   for ( auto pc_tmp = res.first; pc_tmp != res.second; ++pc_tmp ) {
+    std::cout << *(pc_tmp->second) << std::endl;
+    i_tmp++;
+    ck_assert(2 == pc_tmp->second->get_id());
+    ck_assert(i_tmp == pc_tmp->second->get_data<uint32_t>());
+  }
+  ck_assert(i_tmp == 3);
+    std::cout << "test_find_childs END" << std::endl;
 } END_TEST
 
 
 START_TEST(test_add_get_childs) {
+  std::cout << "test_add_get_childs START" << std::endl;
+
+  node<uint32_t, std::shared_ptr> c_node(1234);
+  c_node.set_data<uint32_t>(10);
+  c_node(1).set_data<uint32_t>(1);
+  c_node(2).set_data<uint32_t>(2);
+  c_node(3).set_data<uint32_t>(3);
+  c_node(3)(2).set_data<uint32_t>(42);
+  c_node(4).set_data<uint32_t>(4);
+  c_node(5).set_data<uint32_t>(5);
+
+  uint16_t i_tmp = 0;
+  for(auto c_tmp : c_node) {
+    std::cout << *(c_tmp.second) << std::endl;
+    i_tmp++;
+    ck_assert(i_tmp == c_tmp.second->get_id());
+    ck_assert(i_tmp == c_tmp.second->get_data<uint32_t>());
+  }
+  ck_assert(i_tmp == 5);
+  std::cout << "test_add_get_childs END" << std::endl;
 
 } END_TEST
 
 START_TEST(test_mmap) {
+
+  node<uint32_t, std::shared_ptr> c_node(1234);
+  c_node.set_data<uint32_t>(10);
+  uint32_t* pi_tmp = c_node.mmap<uint32_t>();
+  ck_assert(pi_tmp);
+  ck_assert(*pi_tmp == 10);
 
 } END_TEST
 
@@ -88,6 +285,7 @@ START_TEST(test_doc) {
 
   /* Get data of current node (int32_t)*/
   uint32_t i_tmp = c_example_node.get_data<uint32_t>();
+  std::cout << i_tmp << std::endl;
 
   /* resize data of node */
   c_example_node.resize(4);
@@ -123,12 +321,15 @@ START_TEST(test_doc) {
 
   /* Accessing child with ID 6 and index 0. Node is automatically created if it does not exist */
   node_t & ref_to_child  = c_example_node(6);
+  std::cout << ref_to_child.get_size() << std::endl;
   node_t & ref_to_child2 = c_example_node(6,0);
+  std::cout << ref_to_child2.get_size() << std::endl;
   smart_pointer_to_node_t smart_pointer_to_child = c_example_node.get(6,0,true);
 
   /* Accessing child with ID 6 and index 10. DO NOT WORK if index 9,8,..,1,0 is not available. */
   try {
       node_t & ref_to_child3 = c_example_node(6,10);
+      std::cout << ref_to_child3.get_size() << std::endl;
       smart_pointer_to_node_t smart_pointer_to_child2 = c_example_node.get(6,10,true);
   } catch(...) {
   }
@@ -278,14 +479,6 @@ START_TEST(test_set_get_data) {
   uint8_t i_udata8 = 10;
   int8_t i_data8 = -10;
 
-  int32_t i_udata64_res;
-  int32_t i_data64_res;
-  int32_t i_udata32_res;
-  int32_t i_data32_res;
-  uint16_t i_udata16_res;
-  int16_t i_data16_res;
-  uint8_t i_udata8_res;
-  int8_t i_data8_res;
 
   /*! Create a node with id 0 and store 10 */
 
@@ -318,14 +511,25 @@ Suite * money_suite(void)
   Suite *s;
   TCase *tc_core;
 
-  s = suite_create("Money");
+  s = suite_create("BML");
 
   /* Core test case */
-  tc_core = tcase_create("Core");
+  tc_core = tcase_create("CORE");
 
+
+  tcase_add_test(tc_core, test_write_read_from_buffer);
+  tcase_add_test(tc_core, test_write_read_from_file);
+  tcase_add_test(tc_core, test_copy);
+  tcase_add_test(tc_core, test_segment_offset);
+  tcase_add_test(tc_core, test_segment_memcpy);
+  tcase_add_test(tc_core, test_external_segment);
+  tcase_add_test(tc_core, test_find_childs);
+  tcase_add_test(tc_core, test_add_get_childs);
+  tcase_add_test(tc_core, test_mmap);
   tcase_add_test(tc_core, test_set_get_data);
   tcase_add_test(tc_core, test_memcpy);
   tcase_add_test(tc_core, test_doc);
+  tcase_add_test(tc_core, test_container);
   suite_add_tcase(s, tc_core);
 
   return s;

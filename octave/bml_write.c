@@ -82,15 +82,68 @@ int f_bml_node_write(mxArray const * in_ps_struct, int in_i_cnt, struct ST_BML_H
 	}
 
 	/* Get Id */
-	int64_t i_id;
+	int64_t i_id = 0;
 
-
-	if (mxGetClassID(ps_id) == mxUINT8_CLASS) {
+#if 1
+  switch (mxGetClassID(ps_id)) {
+    case mxUINT8_CLASS:
+    case mxINT8_CLASS:
+    {
+   		uint8_t *ptr = mxGetData(ps_id);
+  		i_id = *ptr;
+  		break;
+    }
+    case mxUINT16_CLASS:
+    case mxINT16_CLASS:
+    {
+   		uint16_t *ptr = mxGetData(ps_id);
+  		i_id = *ptr;
+  		break;
+    }
+    case mxUINT32_CLASS:
+    case mxINT32_CLASS:
+    {
+   		uint32_t *ptr = mxGetData(ps_id);
+  		i_id = *ptr;
+  		break;
+    }
+    case mxUINT64_CLASS:
+    case mxINT64_CLASS:
+    {
+   		uint64_t *ptr = mxGetData(ps_id);
+  		i_id = *ptr;
+  		break;
+    }
+    case mxSINGLE_CLASS:
+    {
+   		float *ptr = mxGetData(ps_id);
+  		i_id = *ptr;
+  		break;
+    }
+    case mxDOUBLE_CLASS:
+    {
+  		i_id = (int64_t) *mxGetPr(ps_id);
+  		break;
+    }
+    default:
+    {
+		  mexErrMsgTxt("Invalid Id type");
+		  return EC_FAILURE;	
+	  }
+	}
+#else
+	if ((mxGetClassID(ps_id) == mxUINT8_CLASS) || (mxGetClassID(ps_id) == mxUINT32_CLASS)) {
 		uint32_t *ptr = mxGetData(ps_id);
 		i_id = *ptr;
 	} else if (mxGetClassID(ps_id) == mxDOUBLE_CLASS) {
 		i_id = (int64_t) *mxGetPr(ps_id);
+	} else {
+		mexErrMsgTxt("Invalid Id type");
+		return EC_FAILURE;	
 	}
+#endif
+
+  // mexPrintf("ID : %lld (0x%llX)\n", i_id, i_id);
 
 	size_t sz_buf = 0;
 	char * pc_buf = NULL;

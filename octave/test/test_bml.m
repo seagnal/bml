@@ -12,7 +12,7 @@ end
 ID=24;
 SUB_ID=16;
 
-fprintf('TEST WRITE: %s\n',filename);
+printf('TEST WRITE: %s\n',filename);
 
 % Opening file in order to write data into
 fid = bml_open(filename, 'w');
@@ -39,7 +39,7 @@ bml_write(fid, struct('id', 10, 'data', "data parent" , "childs", [a, b]));
 bml_close(fid);
 
 
-fprintf('TEST READ\n');
+printf('TEST READ\n');
 
 % Opening file in order to read data from
 fid = bml_open(filename, 'r');
