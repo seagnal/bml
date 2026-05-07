@@ -231,13 +231,13 @@ class bml_socket(bml.writer, bml.parser):
             @param in_sz_data number of bytes to read from socket.
             @param in_first_header first header flag allow callback to exit on new data.
             """
-        print("receive request " +str(in_sz_data) + " bytes (Timeoutable:" + str(in_first_header)+")")
+        # print("receive request " +str(in_sz_data) + " bytes (Timeoutable:" + str(in_first_header)+")")
         sz_remaining = in_sz_data
 
         while 1:
             #update view read
 
-            print("LOOP BEGIN - Received: "+str(self.read_size_tmp)+", Remaining: "+str(sz_remaining)+ ", Offset:" + str(self.read_start_tmp))
+            # print("LOOP BEGIN - Received: "+str(self.read_size_tmp)+", Remaining: "+str(sz_remaining)+ ", Offset:" + str(self.read_start_tmp))
             if self.read_size_tmp < in_sz_data:
                 view_update = self.read_view_tmp[self.read_start_tmp+self.read_size_tmp:]
                 print(len(view_update))
@@ -259,17 +259,17 @@ class bml_socket(bml.writer, bml.parser):
                 assert(len(view_update) >= sz_remaining)
 
 
-                print("Start recv_into "+str(len(view_update)) + " bytes")
+                # print("Start recv_into "+str(len(view_update)) + " bytes")
                 try:
                     nbytes = self.sock.recv_into(view_update, len(view_update), flags=socket.MSG_DONTWAIT)
-                    print("END recv_into "+str(nbytes) + " bytes")
+                    # print("END recv_into "+str(nbytes) + " bytes")
                 except socket.error as msg:
                     if msg.errno != errno.EAGAIN:
                         print("ERROR DONTWAIT:" + str(msg))
                         sys.exit(-1)
                     else:
                         nbytes = 0
-                print("Received "+str(nbytes) + " bytes")
+                # print("Received "+str(nbytes) + " bytes")
 
                 if nbytes == 0:
                     if in_first_header:
@@ -283,18 +283,18 @@ class bml_socket(bml.writer, bml.parser):
                         except socket.error as msg:
                             print("ERROR WAIT:" + str(msg))
                             sys.exit(-1)
-                        print("Received "+str(nbytes) + " bytes (WAIT)")
+                        # print("Received "+str(nbytes) + " bytes (WAIT)")
                 #increment counters
                 self.read_size_tmp += nbytes
                 sz_remaining -= min(nbytes, sz_remaining)
 
-                print("Received: "+str(self.read_size_tmp)+", Remaining: "+str(sz_remaining)+ ", Offset:" + str(self.read_start_tmp))
+                # print("Received: "+str(self.read_size_tmp)+", Remaining: "+str(sz_remaining)+ ", Offset:" + str(self.read_start_tmp))
             else:
                 assert(in_sz_data <= self.read_size_tmp)
                 view_data = self.read_view_tmp[self.read_start_tmp:self.read_start_tmp+in_sz_data]
                 self.read_start_tmp += in_sz_data
                 self.read_size_tmp -= in_sz_data
-                print("Extract: "+str(in_sz_data)+"bytes")
+                # print("Extract: "+str(in_sz_data)+"bytes")
                 return view_data.tobytes()
 
 

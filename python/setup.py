@@ -1,15 +1,15 @@
 from distutils.core import setup, Extension
-import lsb_release
+import distro
 
-print(lsb_release.get_distro_information())
+print(distro.info()['codename'])
 
-if lsb_release.get_distro_information()['CODENAME'] == 'jammy':
+if distro.info()['codename'] == 'jammy':
     python_lib = 'boost_python310'
-elif lsb_release.get_distro_information()['CODENAME'] == 'focal':
+elif distro.info()['codename'] == 'focal':
     python_lib = 'boost_python38'
-elif lsb_release.get_distro_information()['CODENAME'] == 'bionic':
+elif distro.info()['codename'] == 'bionic':
     python_lib = 'boost_python-py36'
-elif lsb_release.get_distro_information()['CODENAME'] == 'xenial':
+elif distro.info()['codename'] == 'xenial':
     python_lib = 'boost_python-py35'
 else:
     python_lib = 'boost_python-py34'
